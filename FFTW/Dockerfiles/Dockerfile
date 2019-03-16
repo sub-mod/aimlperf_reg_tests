@@ -1,0 +1,79 @@
+FROM brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/rhel8:latest
+MAINTAINER Courtney Pacheco <cpacheco@redhat.com>
+ENV LANG=en_US.utf8
+
+# Create RHEL 8 repos
+ENV RHEL8_LATEST /etc/yum.repos.d/rhel80.repo
+ENV RHEL8_ADDITIONAL /etc/yum.repos.d/rhel8-additional-nightly.repo
+ENV RHEL8_APPSTREAM /etc/yum.repos.d/rhel8-additional-nightly-appstream.repo
+RUN echo "[rhel8-Latest]" >> $RHEL8_LATEST && \
+    echo "name=RHEL8-Latest" >> $RHEL8_LATEST && \
+    echo "baseurl=http://download-node-02.eng.bos.redhat.com/rel-eng/repos/rhel-8.0-candidate/x86_64" >> $RHEL8_LATEST && \
+    echo "enabled=1" >> $RHEL8_LATEST && \
+    echo "gpgcheck=0" >> $RHEL8_LATEST && \
+    \
+    echo "[rhel8-additional-latest-nightly-appstream]" >> $RHEL8_APPSTREAM && \
+    echo "name=rhel8-additional-latest-nightly-appstream" >> $RHEL8_APPSTREAM && \
+    echo "baseurl=http://download.eng.rdu2.redhat.com/nightly/rhel-8/RHEL-8/additional-nightly/latest-RHEL-8/compose/AppStream/x86_64/os/" >> $RHEL8_APPSTREAM && \
+    echo "baseurl=http://download.eng.rdu2.redhat.com/nightly/rhel-8/RHEL-8/latest-RHEL-8/compose/AppStream/x86_64/os" >> $RHEL8_APPSTREAM && \
+    echo "enabled=1" >> $RHEL8_APPSTREAM && \
+    echo "gpgcheck=0" >> $RHEL8_APPSTREAM && \
+    dnf -y update && \
+    /bin/rm -rf /var/cache/dnf*
+
+# Set /usr/bin/python to be python36
+RUN ln -s /usr/bin/python /usr/bin/python36
+
+# Install rpmbuild because we will build the package
+RUN dnf -y erase yum
+RUN dnf -y install automake \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/binutils/2.30/52.el8/x86_64/binutils-2.30-52.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/cpp-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/gcc-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/gcc-c++-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/gcc-gfortran-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgcc-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgfortran-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgomp-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libquadmath-8.2.1-3.5.el8.x86_64.rpm \
+                   diffutils \
+                   environment-modules \
+                   libtool \
+                   make \
+                   mpich-devel \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/openmpi/3.1.2/5.el8/x86_64/openmpi-3.1.2-5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/openmpi/3.1.2/5.el8/x86_64/openmpi-devel-3.1.2-5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/opensm/3.3.21/1.el8/x86_64/opensm-3.3.21-1.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/opensm/3.3.21/1.el8/x86_64/opensm-devel-3.3.21-1.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/opensm/3.3.21/1.el8/x86_64/opensm-libs-3.3.21-1.el8.x86_64.rpm \
+                   patch \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-build-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-build-libs-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-libs-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-devel-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/python3-rpm-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpmdevtools/8.10/7.el8/noarch/rpmdevtools-8.10-7.el8.noarch.rpm \
+                   rpmlint \ 
+                   time \
+                   wget --allowerasing --best && \
+    /bin/rm -rf /var/cache/dnf*
+
+# Setup rpmbuild tree
+RUN rpmdev-setuptree
+
+# Get FFTW spec file and move to "SPECS" folder under /root/rpmbuild
+RUN cd /tmp && \
+    wget http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/fftw/3.3.5/11.el8/src/fftw-3.3.5-11.el8.src.rpm && \
+    rpm2cpio fftw-3.3.5-11.el8.src.rpm | cpio -civ && \
+    mv fftw.spec /root/rpmbuild/SPECS && \
+    mv fftw-3.3.5.tar.gz /root/rpmbuild/SOURCES && \
+    rm fftw-3.3.5-11.el8.src.rpm
+
+# Build default FFTW from rpmbuild
+RUN . /usr/share/Modules/init/bash && \
+    cd /root/rpmbuild/SPECS && \
+    sed -i '367 i\   if [ "$mpi" == "mpich" ]; then ROOT_MPIRUN="mpirun"; else ROOT_MPIRUN="mpirun --allow-run-as-root"; fi' fftw.spec && \
+    sed -i '368s|.*%{configure}.*|   %{configure} ${BASEFLAGS} ${prec_flags[iprec]} MPIRUN="${ROOT_MPIRUN}" --enable-mpi \\|' fftw.spec && \
+    cd .. && \
+    rpmbuild -ba ~/rpmbuild/SPECS/fftw.spec > default_fftw_build.log
