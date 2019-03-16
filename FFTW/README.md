@@ -2,34 +2,64 @@
 
 This folder contains regression tests to assess the performance of FFTW's forward and backward FFTs by performing an image blurring task.
 
-# How to Build the Tests
+## Building FFTW
+
+To build FFTW, either use Podman to build the Dockerfile under the "Dockerfiles" folder, or run the scripts in the "installation" folder yourself. Both methods utilize rpmbuild to build the library.
+
+### Podman
+
+If you decide to use Podman, make note of the `FFTW_CFLAGS` and `FFTW_BUILD_FLAGS` environment variables in the Dockerfile. These variables determine which build flags FFTW will be configured to use. Once you've chosen your flags, build the image via:
+
+```
+$ podman build Dockerfiles
+```
+
+### Installation Scripts
+
+If you would like to use the installation scripts, you can run either `build.sh` or `install.sh` to build the library, but of course `install.sh` will also install the generated rpms for you. See
+
+```
+$ sh build.sh -h
+```
+
+for help on how to use the build script. Similarly, use
+
+```
+$ sh install.sh -h
+```
+
+for help on how to use the install script.
+
+Note that if you wish to build FFTW while using root, you will need to use the `-s` flag in both scripts to override the automatic exit. (The exit is for protection.)
+
+## How to Build the Tests
 
 To build the tests,
 
 ```
-. ./run_me.sh /path/to/main/fftw/folder
+$ . ./run_me.sh /path/to/main/fftw/folder
 ```
 
 This command will generate an executable called `2d_fft`.
 
-# How to Run the Tests
+## How to Run the Tests
 
 To run the tests,
 
 ```
-./2d_fft <number-of-threads> <number-of-executions>
+$ ./2d_fft <number-of-threads> <number-of-executions>
 ```
 
 e.g.,
 
 ```
-./2d_fft 24 2
+$ ./2d_fft 24 2
 ```
 
 will execute the tests two times spread across twenty four threads.
 
 
-# Sample Output
+## Sample Output
 
 ```
 PERFORMANCE RESULTS

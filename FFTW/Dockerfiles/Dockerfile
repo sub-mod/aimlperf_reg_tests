@@ -2,6 +2,10 @@ FROM brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/rhel8:latest
 MAINTAINER Courtney Pacheco <cpacheco@redhat.com>
 ENV LANG=en_US.utf8
 
+# Flags for building FFTW. Change these for a different build!
+ENV FFTW_CFLAGS="-O2 -ftree-vectorize -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -Wp,-D_GLIBCXX_ASSERTIONS -fexceptions -fstack-protector-strong -grecord-gcc-switches %{_hardened_cflags} %{_annotated_cflags}"
+ENV FFTW_BUILD_FLAGS="--enable-sse2 --enable-avx --enable-avx2 --enable-fma"
+
 # Create RHEL 8 repos
 ENV RHEL8_LATEST /etc/yum.repos.d/rhel80.repo
 ENV RHEL8_ADDITIONAL /etc/yum.repos.d/rhel8-additional-nightly.repo
@@ -70,9 +74,12 @@ RUN cd /tmp && \
     mv fftw-3.3.5.tar.gz /root/rpmbuild/SOURCES && \
     rm fftw-3.3.5-11.el8.src.rpm
 
-# Build default FFTW from rpmbuild
+# Build FFTW with rpmbuild
 RUN . /usr/share/Modules/init/bash && \
     cd /root/rpmbuild/SPECS && \
+    sed -i '/^%__global_compiler_flags.*/s/^/#/' /usr/lib/rpm/redhat/macros && \
+    sed -i "/.*%__global_compiler_flags.*/a %__global_compiler_flags ${FFTW_CFLAGS}" /usr/lib/rpm/redhat/macros && \
+    sed -i "318s|.*prec_flags.*| prec_flags[i]+=\" ${FFTW_BUILD_FLAGS}\"|" fftw.spec && \
     sed -i '367 i\   if [ "$mpi" == "mpich" ]; then ROOT_MPIRUN="mpirun"; else ROOT_MPIRUN="mpirun --allow-run-as-root"; fi' fftw.spec && \
     sed -i '368s|.*%{configure}.*|   %{configure} ${BASEFLAGS} ${prec_flags[iprec]} MPIRUN="${ROOT_MPIRUN}" --enable-mpi \\|' fftw.spec && \
     cd .. && \
