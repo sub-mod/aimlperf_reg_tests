@@ -15,7 +15,7 @@ usage() {
 
 # Set default values
 run_log="fftw_runs.log"
-max_threads=$(dmidecode -t processor | egrep 'Designation|Count' | egrep -m1 'Thread Count' | cut -d" " -f3)
+max_threads=$(lscpu | awk '/^Core\(s\) per socket:/ {cores=$NF}; /^Socket\(s\):/ {sockets=$NF}; END{print cores*sockets}') #from https://stackoverflow.com/a/31646165
 thread_values="-1"
 
 options=":he:t:l:v:"
