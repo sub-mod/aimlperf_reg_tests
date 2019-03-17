@@ -1,0 +1,131 @@
+FROM brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/rhel8:latest
+MAINTAINER Courtney Pacheco <cpacheco@redhat.com>
+ENV LANG=en_US.utf8
+
+# Flags for building FFTW. Change these for a different build!
+ENV FFTW_CFLAGS="-O2 -ftree-vectorize -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -Wp,-D_GLIBCXX_ASSERTIONS -fexceptions -fstack-protector-strong -grecord-gcc-switches %{_hardened_cflags} %{_annotated_cflags}"
+ENV FFTW_BUILD_FLAGS="--enable-sse2 --enable-avx --enable-avx2 --enable-fma"
+
+# Create RHEL 8 repos
+ENV RHEL8_LATEST /etc/yum.repos.d/rhel80.repo
+ENV RHEL8_ADDITIONAL /etc/yum.repos.d/rhel8-additional-nightly.repo
+ENV RHEL8_APPSTREAM /etc/yum.repos.d/rhel8-additional-nightly-appstream.repo
+RUN echo "[rhel8-Latest]" >> $RHEL8_LATEST && \
+    echo "name=RHEL8-Latest" >> $RHEL8_LATEST && \
+    echo "baseurl=http://download-node-02.eng.bos.redhat.com/rel-eng/repos/rhel-8.0-candidate/x86_64" >> $RHEL8_LATEST && \
+    echo "enabled=1" >> $RHEL8_LATEST && \
+    echo "gpgcheck=0" >> $RHEL8_LATEST && \
+    \
+    echo "[rhel8-additional-latest-nightly-appstream]" >> $RHEL8_APPSTREAM && \
+    echo "name=rhel8-additional-latest-nightly-appstream" >> $RHEL8_APPSTREAM && \
+    echo "baseurl=http://download.eng.rdu2.redhat.com/nightly/rhel-8/RHEL-8/additional-nightly/latest-RHEL-8/compose/AppStream/x86_64/os/" >> $RHEL8_APPSTREAM && \
+    echo "baseurl=http://download.eng.rdu2.redhat.com/nightly/rhel-8/RHEL-8/latest-RHEL-8/compose/AppStream/x86_64/os" >> $RHEL8_APPSTREAM && \
+    echo "enabled=1" >> $RHEL8_APPSTREAM && \
+    echo "gpgcheck=0" >> $RHEL8_APPSTREAM && \
+    dnf -y update && \
+    /bin/rm -rf /var/cache/dnf*
+
+# Set /usr/bin/python to be python36
+RUN ln -s /usr/bin/python /usr/bin/python36
+
+# Install rpmbuild because we will build the package
+RUN dnf -y erase yum
+RUN dnf -y install automake \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/binutils/2.30/52.el8/x86_64/binutils-2.30-52.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/cpp-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/gcc-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/gcc-c++-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/gcc-gfortran-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgcc-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgfortran-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgomp-8.2.1-3.5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libquadmath-8.2.1-3.5.el8.x86_64.rpm \
+                   diffutils \
+                   environment-modules \
+                   libtool \
+                   make \
+                   mpich-devel \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/openmpi/3.1.2/5.el8/x86_64/openmpi-3.1.2-5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/openmpi/3.1.2/5.el8/x86_64/openmpi-devel-3.1.2-5.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/opensm/3.3.21/1.el8/x86_64/opensm-3.3.21-1.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/opensm/3.3.21/1.el8/x86_64/opensm-devel-3.3.21-1.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/opensm/3.3.21/1.el8/x86_64/opensm-libs-3.3.21-1.el8.x86_64.rpm \
+                   patch \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-build-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-build-libs-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-libs-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/rpm-devel-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpm/4.14.2/7.el8/x86_64/python3-rpm-4.14.2-7.el8.x86_64.rpm \
+                   http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/rpmdevtools/8.10/7.el8/noarch/rpmdevtools-8.10-7.el8.noarch.rpm \
+                   rpmlint \ 
+                   time \
+                   wget --allowerasing --best && \
+    /bin/rm -rf /var/cache/dnf*
+
+# Setup rpmbuild tree
+RUN rpmdev-setuptree
+
+# Get FFTW spec file and move to "SPECS" folder under /root/rpmbuild
+RUN cd /tmp && \
+    wget http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/fftw/3.3.5/11.el8/src/fftw-3.3.5-11.el8.src.rpm && \
+    rpm2cpio fftw-3.3.5-11.el8.src.rpm | cpio -civ && \
+    mv fftw.spec /root/rpmbuild/SPECS && \
+    mv fftw-3.3.5.tar.gz /root/rpmbuild/SOURCES && \
+    rm fftw-3.3.5-11.el8.src.rpm
+
+# Build FFTW with rpmbuild
+RUN . /usr/share/Modules/init/bash && \
+    cd /root/rpmbuild/SPECS && \
+    sed -i '/^%__global_compiler_flags.*/s/^/#/' /usr/lib/rpm/redhat/macros && \
+    sed -i "/.*%__global_compiler_flags.*/a %__global_compiler_flags ${FFTW_CFLAGS}" /usr/lib/rpm/redhat/macros && \
+    sed -i "318s|.*prec_flags.*| prec_flags[i]+=\" ${FFTW_BUILD_FLAGS}\"|" fftw.spec && \
+    sed -i '367 i\   if [ "$mpi" == "mpich" ]; then ROOT_MPIRUN="mpirun"; else ROOT_MPIRUN="mpirun --allow-run-as-root"; fi' fftw.spec && \
+    sed -i '368s|.*%{configure}.*|   %{configure} ${BASEFLAGS} ${prec_flags[iprec]} MPIRUN="${ROOT_MPIRUN}" --enable-mpi \\|' fftw.spec && \
+    cd .. && \
+    rpmbuild -ba ~/rpmbuild/SPECS/fftw.spec > default_fftw_build.log
+
+# Download and install ImageMagick, as well as the jpeg library. We need the latest versions, which are NOT in RHEL 8 at the moment
+RUN dnf -y install unzip dos2unix && \
+    mkdir -p /usr/man/man1 && \
+    cd /tmp && \
+    wget https://downloads.sourceforge.net/project/libjpeg/libjpeg/6b/jpegsr6.zip && \
+    unzip jpegsr6.zip && \
+    cd jpeg-6b && \
+    rm config.sub && \
+    wget -c "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD" && \
+    mv 'index.html?p=config.git;a=blob_plain;f=config.sub;hb=HEAD' config.sub && \
+    chmod u+x config.sub && \
+    for f in ./*; do dos2unix $f; done && \
+    ./configure --prefix=/usr --enable-static --enable-shared && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf jpeg-6b && \
+    rm jpegsr6.zip && \
+    wget https://imagemagick.org/download/ImageMagick.tar.gz && \
+    tar xvf ImageMagick.tar.gz && \
+    cd ImageMagick-7.0.8-34 && \
+    ./configure && \
+    make && \
+    make install && \
+    cd .. && \
+    rm ImageMagick.tar.gz && \
+    rm -rf ImageMagick-7.0.8-34 && \
+    dnf -y erase dos2unix && \
+    rm -rf /var/cache/dnf*
+
+# Copy the benchmarks from this repository to this Dockerfile
+ENV FFTW_BENCHMARKS=/home/fftw_benchmarks
+RUN mkdir ${FFTW_BENCHMARKS} && mkdir ${FFTW_BENCHMARKS}/src && mkdir ${FFTW_BENCHMARKS}/test_images
+ADD ../src/guru_real_2D_dft_fftw_malloc.c ${FFTW_BENCHMARKS}/src
+ADD ../compile_benchmark_code.sh ${FFTW_BENCHMARKS}
+ADD ../run_benchmarks.sh ${FFTW_BENCHMARKS}
+ADD ../test_images/cat.jpeg ${FFTW_BENCHMARKS}/test_images
+
+# Compile and run the benchmarks
+RUN dnf -y install numactl && \
+    cd ${FFTW_BENCHMARKS} && \
+    . ./compile_benchmark_code.sh /root/rpmbuild/BUILD/fftw-3.3.5 && \
+    sh ./run_benchmarks.sh -e 10 -l runs.log && \
+    cat runs.log
