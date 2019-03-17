@@ -11,8 +11,10 @@ To build FFTW, either use Podman to build the Dockerfile under the "Dockerfiles"
 If you decide to use Podman, make note of the `FFTW_CFLAGS` and `FFTW_BUILD_FLAGS` environment variables in the Dockerfile. These variables determine which build flags FFTW will be configured to use. Once you've chosen your flags, build the image via:
 
 ```
-$ podman build Dockerfiles
+$ podman build -f Dockerfiles/Dockerfile.[name]
 ```
+
+where `[name]` is either `rpmbuild_only` or `rpmbuild_regression_tests`. The first, as the name says, only builds the FFTW rpms. The second also builds the FFTW rpms, but then adds and runs the regression tests.
 
 ### Installation Scripts
 
