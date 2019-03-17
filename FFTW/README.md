@@ -37,14 +37,29 @@ Note that if you wish to build FFTW while using root, you will need to use the `
 To build the tests,
 
 ```
-$ . ./run_me.sh /path/to/main/fftw/folder
+$ . ./compile_benchmark_code.sh /path/to/main/fftw/folder
 ```
 
 This command will generate an executable called `2d_fft`.
 
 ## How to Run the Tests
 
-To run the tests,
+### Using the Existing Shell Script
+
+To run the tests with the `run_benchmarks.sh` script,
+
+```
+$ ./run_benchmarks.sh -e <number_of_executions> [options]
+```
+
+See `./run_benchmarks.sh -h` for help and more info on how to use the tool.
+
+This tool is useful because it allows you to run a series of benchmark tests with one command, rather than running everything by hand multiple times. It also saves all of the runs to a log file, defined by the user with the `-l` option.
+
+
+### Running by Hand
+
+To run the tests by hand,
 
 ```
 $ ./2d_fft <number-of-threads> <number-of-executions>
