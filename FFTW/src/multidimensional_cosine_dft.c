@@ -1,5 +1,6 @@
 #define _DEFAULT_SOURCE
 #define PI 3.141592653589793238462643383279
+#define TIMELIMIT 2
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +69,7 @@ int main(int argc, char* argv[]){
             printf("Number of iterations must be greater than or equal to 1.\n");
             exit(0);
         }
-        if (fs <= 10e-7){
+        if (fs <= 10e-9){
             printf("Sampling frequency must be greater than 0.0. You entered: %0.2e\n", fs);
             exit(0);
         }
@@ -109,6 +110,9 @@ int main(int argc, char* argv[]){
 
     // Fill N-dimensional cosine matrix
     generate_cosine_data(cosine, fs, rank, n, n_total);
+
+    // Set time limit so that FFTW doesn't spend too much time trying to figure out the "best" algorithm.
+    fftw_set_timelimit(TIMELIMIT);
 
     // Initialize real-to-complex cosine input and output
     double *cosine_original = (double*)fftw_malloc(n_total * sizeof(double));
@@ -171,6 +175,36 @@ int main(int argc, char* argv[]){
     // Plot result to ensure we get back what we put in!
     if (plot == true)
         plot1D(cosine_back, 1, rank, n, title);
+
+    // Create file to save results to
+    FILE *results_file = fopen("fftw_cosine_performance_results.json", "w");
+
+    // Save as JSON
+    fprintf(results_file, "{\n");
+    fprintf(results_file, "    \"performance_results\": {\n");
+    fprintf(results_file, "        \"inputs\": {\n");
+    fprintf(results_file, "            \"rank\": %d,\n", rank);
+    fprintf(results_file, "            \"dims\": [");
+    for (i=0; i<rank-1; i++){
+        fprintf(results_file, " %d,", n[i]);
+    }
+    fprintf(results_file, " %d],\n", n[rank-1]);
+    fprintf(results_file, "            \"fs_Hz\": %0.2e,\n", fs);
+    fprintf(results_file, "            \"iterations\": %d,\n", niters);
+    fprintf(results_file, "            \"threads\": %d\n", nthreads);
+    fprintf(results_file, "        },\n");
+    fprintf(results_file, "        \"forward_dft_results\": {\n");
+    fprintf(results_file, "            \"average_execution_time_seconds\": %0.5f,\n", average_forward_dft_exec_time);
+    fprintf(results_file, "            \"average_tflops\": %0.5Lf\n", forward_dft_tflops_approx);
+    fprintf(results_file, "        },\n");
+    fprintf(results_file, "        \"backward_dft_results\": {\n");
+    fprintf(results_file, "            \"average_execution_time_seconds\": %0.5f,\n", average_backward_dft_exec_time);
+    fprintf(results_file, "            \"average_tflops\": %0.5Lf\n", backward_dft_tflops_approx);
+    fprintf(results_file, "        }\n");
+    fprintf(results_file, "    }\n");
+    fprintf(results_file, "}\n");
+
+    fclose(results_file);
 
     printf("\nPERFORMANCE RESULTS\n");
     printf("===================\n");
