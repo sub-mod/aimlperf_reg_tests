@@ -612,6 +612,36 @@ int main(int argc, char* argv[]){
     double overall_setup_time = wall_time - (total_fft_execution_time + total_ifft_execution_time + total_blur_execution_time);
     double single_image_setup_time = overall_setup_time / (double)niters;
 
+    // Create file to save results to
+    FILE *results_file = fopen("fftw_image_blur_performance_results.json", "w");
+
+    // Save as JSON
+    fprintf(results_file, "{\n");
+    fprintf(results_file, "    \"performance_results\": {\n");
+    fprintf(results_file, "        \"inputs\": {\n");
+    fprintf(results_file, "            \"num_images\": %d,\n", niters);
+    fprintf(results_file, "            \"image_dims\": [%d, %d],\n", width, height);
+    fprintf(results_file, "            \"threads\": %d\n", nthreads);
+    fprintf(results_file, "        },\n");
+    fprintf(results_file, "        \"forward_dft_results\": {\n");
+    fprintf(results_file, "            \"total_execution_time_seconds\": %0.5f,\n", total_fft_execution_time);
+    fprintf(results_file, "            \"average_gflops\": %0.5Lf\n", fft_gflops_approx);
+    fprintf(results_file, "        },\n");
+    fprintf(results_file, "        \"backward_dft_results\": {\n");
+    fprintf(results_file, "            \"total_execution_time_seconds\": %0.5f,\n", total_ifft_execution_time);
+    fprintf(results_file, "            \"average_gflops\": %0.5Lf\n", ifft_gflops_approx);
+    fprintf(results_file, "        },\n");
+    fprintf(results_file, "        \"misc\": {\n");
+    fprintf(results_file, "            \"overall_setup_time_seconds\": %0.5f,\n", overall_setup_time);
+    fprintf(results_file, "            \"blur_time_seconds\": %0.5f,\n", total_blur_execution_time);
+    fprintf(results_file, "            \"wall_time_without_blur_seconds\": %0.5f,\n", wall_time - total_blur_execution_time);
+    fprintf(results_file, "            \"wall_time_seconds\": %0.5f\n", wall_time);
+    fprintf(results_file, "        }\n");
+    fprintf(results_file, "    }\n");
+    fprintf(results_file, "}\n");
+
+    fclose(results_file);
+
     // Print out performance results
     printf("\nPERFORMANCE RESULTS\n");
     printf("===================\n");
