@@ -42,7 +42,7 @@ To build the tests,
 $ . ./compile_benchmark_code.sh /path/to/main/fftw/folder
 ```
 
-This command will generate an executable called `2d_fft`.
+This command will generate two executables: `2d_fft` and `nd_cosine_ffts`.
 
 ## How to Run the Tests
 
@@ -51,17 +51,36 @@ This command will generate an executable called `2d_fft`.
 To run the tests with the `run_benchmarks.sh` script,
 
 ```
-$ ./run_benchmarks.sh -e <number_of_executions> [options]
+$ ./run_benchmarks.sh -i <number_of_iterations> -e <executable> [options]
 ```
 
-See `./run_benchmarks.sh -h` for help and more info on how to use the tool.
+where `<executable>` is either `2d_fft` or `nd_cosine_ffts`.
+
+Note that for `nd_cosine_ffts`, there are additional required flags. See `./run_benchmarks.sh -h` for help and more info on the options available.
 
 This tool is useful because it allows you to run a series of benchmark tests with one command, rather than running everything by hand multiple times. It also saves all of the runs to a log file, defined by the user with the `-l` option.
 
+Example for `2d_fft`:
+
+```
+$ ./run_benchmarks.sh -i 1000 -e 2d_fft -v "2 4 9"
+```
+
+This command will run the `2d_fft` executable on 2, 4, and 9 threads, and each time it will process 1000 images.
+
+Example for `nd_cosine_ffts`:
+
+```
+$ ./run_benchmarks.sh -e nd_cosine_ffts -i 14 -r 2 -f 0.001 -d "300 300"
+```
+
+This command will run the `nd_cosine_ffts` on fourteen 2D cosine matrices--each dimension being 300 in size--with a sampling frequency `Fs=0.001`. Since no thread values were specified, the thread values will be powers of 2, up to the maximum number of real cores on your system.
+
+To optimize performance, you can use the `-n` option to enable numactl.
 
 ### Running by Hand
 
-To run the tests by hand,
+To run the image blurring test by hand,
 
 ```
 $ ./2d_fft <number-of-threads> <number-of-executions>
@@ -75,8 +94,28 @@ $ ./2d_fft 24 2
 
 will execute the tests two times spread across twenty four threads.
 
+To run the cosine FFT tests by hand,
 
-## Sample Output
+```
+$ ./nd_cosine_ffts "noplot" 24 10 0.00001 2 30000 30000 
+```
+
+The `"noplot"` parameter tells the executable not to plot the results. If you want to plot the results, however, change `"noplot"` to `"plot"`--but make sure you have gnuplot installed!
+
+If you want a quick rundown of parameter info, simply run
+
+```
+$ ./nd_cosine_ffts
+```
+
+This will throw an error, but the error will tell you all the parameters that are required and in what order.
+
+
+## Sample Outputs
+
+Below are sample outputs from each FFTW test set.
+
+### Image Blurring
 
 ```
 PERFORMANCE RESULTS
@@ -102,4 +141,22 @@ Wall time
 Wall time (excluding blur time)
     Took 0.437 sec to blur 2 images (only FFTW computations)
     Took 0.219 sec to blur single image (only FFTW computations)
+```
+
+### Cosine FFTs
+
+```
+PERFORMANCE RESULTS
+===================
+Input Info:
+    One 2D cosine: 30000 x 30000 samples
+    fs = 1.00e-03 Hz
+    14 iterations
+    24 threads used
+DFT Results
+    Forward DFT execution time: 1.698 sec 
+    Forward DFT TFlops: 3591.624
+    Backward DFT execution time: 1.784 sec 
+    Backward DFT TFlops: 3419.213
+
 ```
