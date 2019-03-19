@@ -1,5 +1,5 @@
 /* Performs a 2D *forward* DFT for 'real' data */
-
+#define _DEFAULT_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 //#include <time.h>
@@ -10,7 +10,11 @@
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
 
+#define BUFFSIZE 4096
 #define ALIGNMENT 16   //for aligned allocation --> set to page size, NOT number of bytes in AVX* instructions
 #define NITERS 1000       //number of times we should replicate the image blurring before finding an average
 #define PI 3.14159265359
@@ -63,19 +67,25 @@ int main(int argc, char* argv[]){
 
     // Get num threads and num iterations
     int nthreads, niters;
+    char *filename;
     char *pEnd;
     if (argc == 1){
         printf("Please enter number of threads to use and number of iterations to execute.\n");
         exit(0);
     }
     else if (argc == 2){
-        printf("Only one argument was passed. Please pass both arguments, the first being the number of threads and the second being the number of iterations to execute.\n");
+        printf("Only one argument was passed. Please pass all three arguments: (1.) number of threads, (2.) number of iterations to execute, and (3.) JSON document filename to save the results to.\n");
+        exit(0);
+    }
+    else if (argc == 3){
+        printf("Only two arguments were passed. Please pass all three arguments: (1.) number of threads, (2.) number of iterations to execute, and (3.) JSON document filename to save the results to.\n");
         exit(0);
     }
     else{
 
         nthreads = (int)strtol(argv[1], &pEnd, 10);
         niters = (int)strtol(argv[2], &pEnd, 10);
+        filename = argv[3];
 
         if (nthreads < 1){
             printf("Number of threads must be greater than or equal to 1.\n");
@@ -595,12 +605,6 @@ int main(int argc, char* argv[]){
     long double fft_gflops_approx = niters / total_fft_execution_time;
     long double ifft_gflops_approx = niters / total_ifft_execution_time;
 
-    /*
-    // Convert to teraflops
-    long double fft_tflops_approx = fft_gflops_approx * 1e-3;
-    long double ifft_tflops_approx = ifft_gflops_approx * 1e-3;
-    */
-
     // Get average wall times
     double average_wall_time = wall_time / (double)niters;
     double average_wall_time_excluding_blur = (wall_time - total_blur_execution_time) / (double)niters;
@@ -612,8 +616,61 @@ int main(int argc, char* argv[]){
     double overall_setup_time = wall_time - (total_fft_execution_time + total_ifft_execution_time + total_blur_execution_time);
     double single_image_setup_time = overall_setup_time / (double)niters;
 
-    // Create file to save results to
-    FILE *results_file = fopen("fftw_image_blur_performance_results.json", "w");
+    // Prepare file to save results to
+    char *tmp_filename = "tmp.json";
+
+    // Open the temporary file for writing
+    FILE *tmp_file = fopen(tmp_filename, "w");
+
+    // If there's an existing file, we'll need to open it, read it, copy the lines, then add to a new file
+    bool file_exists = false;
+    int i;
+    if (access(filename, F_OK) != -1){
+
+        // Change file_exists to 'true' because the file exists!
+        file_exists = true;
+
+        // Create temporary file and open
+        FILE *results_file = fopen(filename, "r");
+
+        // Iterate through all the lines to get the length of the file
+        int file_length = 0;
+        char buffer[BUFFSIZE] = {'\0'};
+        while (fgets(buffer, BUFFSIZE, results_file))
+            file_length++;
+        fclose(results_file);
+
+        // Clear buffer by setting all chars to NULL
+        for (i=0; i<BUFFSIZE; i++)
+            buffer[i] = '\0';
+
+        // Now open again
+        int current_line_no = 0;
+        results_file = fopen(filename, "r");
+
+        // We want to copy every single line into a temporary file EXCEPT the last line, hence "current_line_no < file_length"
+        char curr_char = '\0';
+        while (fgets(buffer, BUFFSIZE, results_file) && (current_line_no < file_length-2)){
+
+            // Iterate through all the characters in 'buffer'
+            for (i=0; i<BUFFSIZE; i++){
+
+                // Get current character
+                curr_char = buffer[i];
+
+                // If the last character is not "\n", then it means we still have characters that we need to write to the file
+                if (curr_char != '\0')
+                    fputc(curr_char, tmp_file);
+
+                // Clear buffer
+                buffer[i] = '\0';
+            }
+
+            // Update line number
+            current_line_no++;
+        }
+        fprintf(tmp_file, "    },\n");
+    }
 
     // Get timestamp
     time_t raw_time = time(NULL);
@@ -621,32 +678,40 @@ int main(int argc, char* argv[]){
     timeinfo = localtime(&raw_time);
 
     // Save as JSON
-    fprintf(results_file, "{\n");
-    fprintf(results_file, "    \"timestamp\": \"%d-%d-%d %d:%d:%d\",\n", timeinfo->tm_year+1900, timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-    fprintf(results_file, "    \"performance_results\": {\n");
-    fprintf(results_file, "        \"inputs\": {\n");
-    fprintf(results_file, "            \"num_images\": %d,\n", niters);
-    fprintf(results_file, "            \"image_dims\": [%d, %d],\n", width, height);
-    fprintf(results_file, "            \"threads\": %d\n", nthreads);
-    fprintf(results_file, "        },\n");
-    fprintf(results_file, "        \"forward_dft_results\": {\n");
-    fprintf(results_file, "            \"total_execution_time_seconds\": %0.5f,\n", total_fft_execution_time);
-    fprintf(results_file, "            \"average_gflops\": %0.5Lf\n", fft_gflops_approx);
-    fprintf(results_file, "        },\n");
-    fprintf(results_file, "        \"backward_dft_results\": {\n");
-    fprintf(results_file, "            \"total_execution_time_seconds\": %0.5f,\n", total_ifft_execution_time);
-    fprintf(results_file, "            \"average_gflops\": %0.5Lf\n", ifft_gflops_approx);
-    fprintf(results_file, "        },\n");
-    fprintf(results_file, "        \"misc\": {\n");
-    fprintf(results_file, "            \"overall_setup_time_seconds\": %0.5f,\n", overall_setup_time);
-    fprintf(results_file, "            \"blur_time_seconds\": %0.5f,\n", total_blur_execution_time);
-    fprintf(results_file, "            \"wall_time_without_blur_seconds\": %0.5f,\n", wall_time - total_blur_execution_time);
-    fprintf(results_file, "            \"wall_time_seconds\": %0.5f\n", wall_time);
-    fprintf(results_file, "        }\n");
-    fprintf(results_file, "    }\n");
-    fprintf(results_file, "}\n");
+    if (file_exists == false)
+        fprintf(tmp_file, "{\n");
+    else
+        fprintf(tmp_file, "\n");
+    fprintf(tmp_file, "    \"%d-%d-%d %d:%d:%d\": {\n", timeinfo->tm_year+1900, timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    fprintf(tmp_file, "        \"performance_results\": {\n");
+    fprintf(tmp_file, "            \"inputs\": {\n");
+    fprintf(tmp_file, "                \"num_images\": %d,\n", niters);
+    fprintf(tmp_file, "                \"image_dims\": [%d, %d],\n", width, height);
+    fprintf(tmp_file, "                \"threads\": %d\n", nthreads);
+    fprintf(tmp_file, "            },\n");
+    fprintf(tmp_file, "            \"forward_dft_results\": {\n");
+    fprintf(tmp_file, "                \"total_execution_time_seconds\": %0.5f,\n", total_fft_execution_time);
+    fprintf(tmp_file, "                \"average_gflops\": %0.5Lf\n", fft_gflops_approx);
+    fprintf(tmp_file, "            },\n");
+    fprintf(tmp_file, "            \"backward_dft_results\": {\n");
+    fprintf(tmp_file, "                \"total_execution_time_seconds\": %0.5f,\n", total_ifft_execution_time);
+    fprintf(tmp_file, "                \"average_gflops\": %0.5Lf\n", ifft_gflops_approx);
+    fprintf(tmp_file, "            },\n");
+    fprintf(tmp_file, "            \"misc\": {\n");
+    fprintf(tmp_file, "                \"overall_setup_time_seconds\": %0.5f,\n", overall_setup_time);
+    fprintf(tmp_file, "                \"blur_time_seconds\": %0.5f,\n", total_blur_execution_time);
+    fprintf(tmp_file, "                \"wall_time_without_blur_seconds\": %0.5f,\n", wall_time - total_blur_execution_time);
+    fprintf(tmp_file, "                \"wall_time_seconds\": %0.5f\n", wall_time);
+    fprintf(tmp_file, "            }\n");
+    fprintf(tmp_file, "        }\n");
+    fprintf(tmp_file, "    }\n");
+    fprintf(tmp_file, "}\n");
 
-    fclose(results_file);
+    // Make sure to close
+    fclose(tmp_file);
+
+    // Rename the temp file
+    rename(tmp_filename, filename);
 
     // Print out performance results
     printf("\nPERFORMANCE RESULTS\n");

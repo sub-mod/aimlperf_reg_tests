@@ -109,6 +109,12 @@ if (( $num_executions == -2222 )); then
     usage
 fi
 
+# Check if JSON filename was passed
+if [[ "$json_doc" == "NULL" ]]; then
+    echo "No JSON document name was passed. Please supply a value for -j"
+    usage
+fi
+
 ###################################################
 #            FOR THE 2D_FFT EXECUTABLE            #
 ###################################################
@@ -121,17 +127,17 @@ if [ "$executable" == "2d_fft" ]; then
         do
             echo "Executing ./2d_fft $k $num_executions"
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./2d_fft $k $num_executions >> $run_log
+                numactl -C 0-$num_threads -i 0,1 ./2d_fft $k $num_executions $json_doc >> $run_log
             else
-                ./2d_fft $k $num_executions >> $run_log
+                ./2d_fft $k $num_executions $json_doc >> $run_log
             fi
         done
         if [ $max_threads > $k ]; then
             echo "Executing ./2d_fft $max_threads $num_executions"
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./2d_fft $max_threads $num_executions >> $run_log
+                numactl -C 0-$num_threads -i 0,1 ./2d_fft $max_threads $num_executions $json_doc >> $run_log
             else
-                ./2d_fft $k $num_executions >> $run_log
+                ./2d_fft $k $num_executions $json_doc >> $run_log
             fi
         fi
     # Else, use the thread values the user specified
@@ -140,9 +146,9 @@ if [ "$executable" == "2d_fft" ]; then
         for k in $thread_values; do
             echo "Executing ./2d_fft $k $num_executions"
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./2d_fft $k $num_executions >> $run_log
+                numactl -C 0-$num_threads -i 0,1 ./2d_fft $k $num_executions $json_doc >> $run_log
             else
-                ./2d_fft $k $num_executions >> $run_log
+                ./2d_fft $k $num_executions $json_doc >> $run_log
             fi
         done
     fi
@@ -171,12 +177,6 @@ elif [ "$executable" == "nd_cosine_ffts" ]; then
     elif (( $(echo "$fs <= 0" | bc -l) )); then
         echo "Sampling frequency must be greater than 0."
         exit
-    fi
-
-    # Check if JSON filename was passed
-    if [[ "$json_doc" == "NULL" ]]; then
-        echo "No JSON document name was passed. Please supply a value for -j"
-        usage
     fi
 
     # Check the rank vs passed in dimensions
