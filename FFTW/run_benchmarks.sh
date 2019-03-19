@@ -35,7 +35,7 @@ fs=-2222
 plot=0
 json_doc="NULL"
 
-options=":hpi:f:e:t:d:l:v:r:j:"
+options=":hpi:f:e:t:d:l:v:r:j:n"
 while getopts "$options" x
 do
     case "$x" in
@@ -127,7 +127,7 @@ if [ "$executable" == "2d_fft" ]; then
         do
             echo "Executing ./2d_fft $k $num_executions"
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./2d_fft $k $num_executions $json_doc >> $run_log
+                numactl -C 0-$k -i 0,1 ./2d_fft $k $num_executions $json_doc >> $run_log
             else
                 ./2d_fft $k $num_executions $json_doc >> $run_log
             fi
@@ -135,7 +135,7 @@ if [ "$executable" == "2d_fft" ]; then
         if [ $max_threads > $k ]; then
             echo "Executing ./2d_fft $max_threads $num_executions"
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./2d_fft $max_threads $num_executions $json_doc >> $run_log
+                numactl -C 0-$k -i 0,1 ./2d_fft $max_threads $num_executions $json_doc >> $run_log
             else
                 ./2d_fft $k $num_executions $json_doc >> $run_log
             fi
@@ -146,7 +146,7 @@ if [ "$executable" == "2d_fft" ]; then
         for k in $thread_values; do
             echo "Executing ./2d_fft $k $num_executions"
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./2d_fft $k $num_executions $json_doc >> $run_log
+                numactl -C 0-$k -i 0,1 ./2d_fft $k $num_executions $json_doc >> $run_log
             else
                 ./2d_fft $k $num_executions $json_doc >> $run_log
             fi
@@ -208,7 +208,7 @@ elif [ "$executable" == "nd_cosine_ffts" ]; then
         do
             echo "Executing ./nd_cosine_ffts $should_plot json=$json_doc nthreads=$k num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
+                numactl -C 0-$k -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             else
                 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             fi
@@ -216,7 +216,7 @@ elif [ "$executable" == "nd_cosine_ffts" ]; then
         if [ $max_threads > $k ]; then
             echo "Executing ./nd_cosine_ffts $should_plot json=$json_doc nthreads=$max_threads num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $max_threads $num_executions $fs $rank $dimensions >> $run_log
+                numactl -C 0-$max_threads -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $max_threads $num_executions $fs $rank $dimensions >> $run_log
             else
                 ./nd_cosine_ffts $should_plot $json_doc $max_threads $num_executions $fs $rank $dimensions >> $run_log
             fi
@@ -227,7 +227,7 @@ elif [ "$executable" == "nd_cosine_ffts" ]; then
         for k in $thread_values; do
             echo "Executing ./nd_cosine_ffts $should_plot json=$json_doc nthreads=$k num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
+                numactl -C 0-$k -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             else
                 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             fi
