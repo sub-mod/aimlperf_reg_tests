@@ -18,6 +18,14 @@ where `[name]` is either `rpmbuild_only` or `rpmbuild_regression_tests`. The fir
 
 Note that, for either Dockerfile, `rpmbuild` builds and executes unit tests on the FFTW library upon completion of the build. These unit tests tend to be the longest part of the FFTW build.
 
+If you wish to build `Dockerfile.rpmbuild_regression_tests` *and* use `numactl` for running the regression tests (since numactl can boost performance), you'll need to: (1.) Pass in the numactl seccomp profile under `seccomp_profiles` and (2.) pass in the build argument for the flag `use_numactl`. That is,
+
+```
+$ podman build -f Dockerfiles/Dockerfile.rpmbuild_regression_tests --security-opt="seccomp=seccomp_profiles/numactl_seccomp.json" --build-arg use_numactl="true"
+```
+
+This seccomp file was written by w1ndy to avoid the need to use `--privileged` with `numactl`: https://gist.github.com/w1ndy/4aee49aa3a608c977a858542ed5f1ee5
+
 ### Installation Scripts
 
 If you would like to use the installation scripts, you can run either `build.sh` or `install.sh` to build the library, but of course `install.sh` will also install the generated rpms for you. See
@@ -88,7 +96,7 @@ $ ./run_benchmarks.sh -e nd_cosine_ffts -i 14 -r 2 -f 0.001 -d "300 300" -j "fft
 
 This command will run the `nd_cosine_ffts` on fourteen 2D cosine matrices--each dimension being 300 in size--with a sampling frequency `Fs=0.001`, and it will save the performance results to `fftw_cosine_performance_results.json`. Since the `-v` option wasn't used, again, the thread values will be powers of 2, up to the maximum number of real cores on your system.
 
-To optimize performance, you can use the `-n` option to enable `numactl`. If the `-v` option is not passed to the benchmark script, then `numactl` will run up to a maximum of "\# of real cores" threads to avoid running on hyperthreads.
+To optimize performance, you can use the `-n` option to enable `numactl`. If the `-v` option is not passed to the benchmark script, then `numactl` will run up to a maximum of "\# of real cores" threads to avoid running on hyperthreads. But remember, to use numactl in Podman, you'll have to pass in the seccomp profile. (See the **Building FFTW** section at the top of this document for more info.)
 
 ### Running by Hand
 

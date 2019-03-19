@@ -74,7 +74,9 @@ RUN cd /tmp && \
     mv fftw-3.3.5.tar.gz /root/rpmbuild/SOURCES && \
     rm fftw-3.3.5-11.el8.src.rpm
 
-# Build FFTW with rpmbuild
+# Build FFTW with rpmbuild. Note that we must set the "global compiler flags" (i.e., CFLAGS) by editing the macros file. Also, because
+# openmpi will not run under root by default, we must add "--allow-run-as-root" to the mpirun command. HOWEVER, the --allow-run-as-root
+# flag is NOT recognized by the mpich version of rmpirun. Thus, we need a conditional statement where we add --allow-run-as-root.
 RUN . /usr/share/Modules/init/bash && \
     cd /root/rpmbuild/SPECS && \
     sed -i '/^%__global_compiler_flags.*/s/^/#/' /usr/lib/rpm/redhat/macros && \
@@ -83,9 +85,12 @@ RUN . /usr/share/Modules/init/bash && \
     sed -i '367 i\   if [ "$mpi" == "mpich" ]; then ROOT_MPIRUN="mpirun"; else ROOT_MPIRUN="mpirun --allow-run-as-root"; fi' fftw.spec && \
     sed -i '368s|.*%{configure}.*|   %{configure} ${BASEFLAGS} ${prec_flags[iprec]} MPIRUN="${ROOT_MPIRUN}" --enable-mpi \\|' fftw.spec && \
     cd .. && \
-    rpmbuild -ba ~/rpmbuild/SPECS/fftw.spec > default_fftw_build.log
+    rpmbuild -ba ~/rpmbuild/SPECS/fftw.spec > fftw_build.log
 
-# Download and install ImageMagick, as well as the jpeg library. We need the latest versions, which are NOT in RHEL 8 at the moment
+# Download and install ImageMagick, as well as the jpeg library. We need the latest versions, which are NOT in RHEL 8 at the moment.
+# Additionally, one of the (known) problems with libjpeg is that the code has Windows line endings (\r\n) rather than Linux line endings.
+# Thus, we must use dos2unix to convert the line endings from Windows to Linux. And finally, we need to download the latest config.sub
+# file because the config.sub file that comes with libjpeg is outdated and does not recognize newer hardware!
 RUN dnf -y install unzip dos2unix && \
     mkdir -p /usr/man/man1 && \
     cd /tmp && \
@@ -124,9 +129,15 @@ ADD ../compile_benchmark_code.sh ${FFTW_BENCHMARKS}
 ADD ../run_benchmarks.sh ${FFTW_BENCHMARKS}
 ADD ../test_images/cat.jpeg ${FFTW_BENCHMARKS}/test_images
 
+# Flag for using numactl
+ARG use_numactl="false"
+ENV USE_NUMACTL=${use_numactl}
+
 # Compile and run the benchmarks
 RUN dnf -y install bc && \
+    if [ ${USE_NUMACTL} == "true" ]; then dnf -y install numactl; fi && \
+    rm -rf /var/cache/dnf* && \
     cd ${FFTW_BENCHMARKS} && \
     . ./compile_benchmark_code.sh /root/rpmbuild/BUILD/fftw-3.3.5 && \
-    sh ./run_benchmarks.sh -e "nd_cosine_ffts" -i 3 -r 2 -d "30000 30000" -f 0.00001 -j "fftw_cosine_performance_results.json" && \
+    if [ ${USE_NUMACTL} == "true" ]; then sh run_benchmarks.sh -n -e "nd_cosine_ffts" -i 3 -r 2 -d "30000 30000" -f 0.00001 -j "fftw_cosine_performance_results.json"; else  sh run_benchmarks.sh -e "nd_cosine_ffts" -i 3 -r 2 -d "30000 30000" -f 0.00001 -j "fftw_cosine_performance_results.json"; fi && \
     cat fftw_cosine_performance_results.json
