@@ -1,7 +1,7 @@
 #!/bin/bash
 
 usage() {
-    echo "Usage: $0 [-i iterations] [-e executable] [-r rank] [-d dimensions] [-f sampling_frequency] [-p] [-t] [-l log_filename] [-v thread_values] [-h]"
+    echo "Usage: $0 [-i iterations] [-e executable] [-j json_filename] [-r rank] [-d dimensions] [-f sampling_frequency] [-p] [-t] [-l log_filename] [-v thread_values] [-n] [-h]"
     echo "  REQUIRED:"
     echo "  -i  Number of iterations. For 2d_fft, use this value to emulate the number of images processed. For nd_cosine_ffts, use this value to emulate the number of cosine matrices to perform fourier transforms on."
     echo "  -e  Path to executable."
