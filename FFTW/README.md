@@ -71,10 +71,10 @@ This command will run the `2d_fft` executable on 2, 4, and 9 threads, and each t
 Example for `nd_cosine_ffts`:
 
 ```
-$ ./run_benchmarks.sh -e nd_cosine_ffts -i 14 -r 2 -f 0.001 -d "300 300"
+$ ./run_benchmarks.sh -e nd_cosine_ffts -i 14 -r 2 -f 0.001 -d "300 300" -j "fftw_cosine_performance_results.json"
 ```
 
-This command will run the `nd_cosine_ffts` on fourteen 2D cosine matrices--each dimension being 300 in size--with a sampling frequency `Fs=0.001`. Since no thread values were specified, the thread values will be powers of 2, up to the maximum number of real cores on your system.
+This command will run the `nd_cosine_ffts` on fourteen 2D cosine matrices--each dimension being 300 in size--with a sampling frequency `Fs=0.001`, and it will save the performance results to `fftw_cosine_performance_results.json`. Since no thread values were specified, the thread values will be powers of 2, up to the maximum number of real cores on your system.
 
 To optimize performance, you can use the `-n` option to enable numactl.
 
@@ -97,10 +97,10 @@ will execute the tests two times spread across twenty four threads.
 To run the cosine FFT tests by hand,
 
 ```
-$ ./nd_cosine_ffts "noplot" 24 10 0.00001 2 30000 30000 
+$ ./nd_cosine_ffts "noplot" "test.json" 24 10 0.00001 2 30000 30000 
 ```
 
-The `"noplot"` parameter tells the executable not to plot the results. If you want to plot the results, however, change `"noplot"` to `"plot"`--but make sure you have gnuplot installed!
+The `"noplot"` parameter tells the executable not to plot the results. If you want to plot the results, however, change `"noplot"` to `"plot"`--but make sure you have gnuplot installed! Look for `test.json` to see performance results.
 
 If you want a quick rundown of parameter info, simply run
 

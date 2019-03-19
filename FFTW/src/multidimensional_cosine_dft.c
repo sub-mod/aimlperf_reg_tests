@@ -1,6 +1,7 @@
 #define _DEFAULT_SOURCE
 #define PI 3.141592653589793238462643383279
 #define TIMELIMIT 2
+#define BUFFSIZE 4096
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +11,7 @@
 #include <fftw3.h>
 #include <stdbool.h>
 #include <string.h>
-
+#include <unistd.h>
 
 void generate_cosine_data(double *cosine, double fs, int rank, int *n, int matrix_size);
 void fill_row(double *cosine, double fs, int row_length, int start_idx, int n_sum, int matrix_size);
@@ -26,14 +27,15 @@ int main(int argc, char* argv[]){
     char *plot_opt; //user passes either "plot" or "noplot" for plotting
     double fs; //sampling frequency (double values)
     int nthreads, niters, rank;
+    char *filename;
     int n[100]; //will hold all of the rank data... max of 100 dims
     char *pEnd;
     if (argc == 1){
-        printf("No arguments were passed! Please enter: (1.) \"noplot\" or \"plot\" for plotting, (2.) number of threads to use, (3.) number of iterations to execute, (4.) the sampling frequency \"fs\" for the cosine, (5.) the rank of the cosine, and (6.) the size of each dimension.\n");
+        printf("No arguments were passed! Please enter: (1.) \"noplot\" or \"plot\" for plotting, (2.) JSON document name to save results to, (3.) number of threads to use, (4.) number of iterations to execute, (5.) the sampling frequency \"fs\" for the cosine, (6.) the rank of the cosine, and (7.) the size of each dimension.\n");
         exit(0);
     }
     else if (argc < 5){
-        printf("Only %d argument(s) given. Minimum number of arguments is 6. Please enter: (1.) \"noplot\" or \"plot\" for plotting, (2.) number of threads to use, (3.) number of iterations to execute, (4.) the sampling frequency \"fs\" for the cosine, (5.) the rank of the cosine, and (6.) the size of each dimension", argc-1);
+        printf("Only %d argument(s) given. Minimum number of arguments is 6. Please enter: (1.) \"noplot\" or \"plot\" for plotting, (2.) JSON document name to save results to, (3.) number of threads to use, (4.) number of iterations to execute, (5.) the sampling frequency \"fs\" for the cosine, (6.) the rank of the cosine, and (7.) the size of each dimension", argc-1);
         exit(0);
     }
     else{
@@ -48,18 +50,19 @@ int main(int argc, char* argv[]){
             exit(0);
         }
 
-        nthreads = (int)strtol(argv[2], &pEnd, 10);
-        niters = (int)strtol(argv[3], &pEnd, 10);
-        fs = atof(argv[4]);
-        rank = (int)strtol(argv[5], &pEnd, 10);
+        filename = argv[2];
+        nthreads = (int)strtol(argv[3], &pEnd, 10);
+        niters = (int)strtol(argv[4], &pEnd, 10);
+        fs = atof(argv[5]);
+        rank = (int)strtol(argv[6], &pEnd, 10);
 
-        if (argc <= rank+5){
-            printf("Rank is set to %d, but %d dimensions were passed. The number of dimensions passed must equal the rank. Exiting now.\n", rank, (rank+5-argc));
+        if (argc <= rank+6){
+            printf("Rank is set to %d, but %d dimensions were passed. The number of dimensions passed must equal the rank. Exiting now.\n", rank, (rank+6-argc));
             exit(0);
         }
 
-        for (i=6; i<rank+6; i++){
-            n[i-6] = (int)strtol(argv[i], &pEnd, 10);
+        for (i=7; i<rank+7; i++){
+            n[i-7] = (int)strtol(argv[i], &pEnd, 10);
         }
 
         if (nthreads < 1){
@@ -155,10 +158,6 @@ int main(int argc, char* argv[]){
         fftw_destroy_plan(backward_cos_dft_plan);
     }
 
-    //for (i=n[0]; i<n[0]+n[1]; i++){
-    //    printf("cosine[%d] = %0.2f\n", i, cosine[i]);
-    //}
-
     // Handle threading
     fftw_cleanup_threads();
 
@@ -177,8 +176,63 @@ int main(int argc, char* argv[]){
     if (plot == true)
         plot1D(cosine_back, 1, rank, n, title);
 
-    // Create file to save results to
-    FILE *results_file = fopen("fftw_cosine_performance_results.json", "w");
+    // Prepare file to save results to
+    //char *filename = "fftw_cosine_performance_results.json";
+    char *tmp_filename = "tmp.json";
+
+    // Open the temporary file for writing
+    FILE *tmp_file = fopen(tmp_filename, "w");
+
+    // If there's an existing file, we'll need to open it, read it, copy the lines, then add to a new file
+    bool file_exists = false;
+    if (access(filename, F_OK) != -1){
+
+        // Change file_exists to 'true' because the file exists!
+        file_exists = true;
+
+        // Create temporary file and open
+        FILE *results_file = fopen(filename, "r");
+
+        // Iterate through all the lines to get the length of the file
+        int file_length = 0;
+        char buffer[BUFFSIZE] = {'\0'};
+        while (fgets(buffer, BUFFSIZE, results_file))
+            file_length++;
+        fclose(results_file);
+
+        // Clear buffer by setting all chars to NULL
+        for (i=0; i<BUFFSIZE; i++)
+            buffer[i] = '\0';
+
+        // Now open again
+        int current_line_no = 0;
+        results_file = fopen(filename, "r");
+
+        // We want to copy every single line into a temporary file EXCEPT the last line, hence "current_line_no < file_length"
+        char curr_char = '\0';
+        while (fgets(buffer, BUFFSIZE, results_file) && (current_line_no < file_length-2)){
+
+            // Iterate through all the characters in 'buffer'
+            for (i=0; i<BUFFSIZE; i++){
+
+                // Get current character
+                curr_char = buffer[i];
+
+                // If the last character is not "\n", then it means we still have characters that we need to write to the file
+                if (curr_char != '\0')
+                    fputc(curr_char, tmp_file);
+
+                // Clear buffer
+                buffer[i] = '\0';
+            }
+
+            // Update line number
+            current_line_no++;
+        }
+
+        // Finally,
+        fprintf(tmp_file, "    },\n");
+    }
 
     // Get timestamp
     time_t raw_time = time(NULL);
@@ -186,32 +240,40 @@ int main(int argc, char* argv[]){
     timeinfo = localtime(&raw_time);
 
     // Save as JSON
-    fprintf(results_file, "{\n");
-    fprintf(results_file, "    \"timestamp\": \"%d-%d-%d %d:%d:%d\",\n", timeinfo->tm_year+1900, timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-    fprintf(results_file, "    \"performance_results\": {\n");
-    fprintf(results_file, "        \"inputs\": {\n");
-    fprintf(results_file, "            \"rank\": %d,\n", rank);
-    fprintf(results_file, "            \"dims\": [");
+    if (file_exists == false)
+        fprintf(tmp_file, "{\n");
+    else
+        fprintf(tmp_file, "\n");
+    fprintf(tmp_file, "    \"%d-%d-%d %d:%d:%d\": {\n", timeinfo->tm_year+1900, timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    fprintf(tmp_file, "        \"performance_results\": {\n");
+    fprintf(tmp_file, "            \"inputs\": {\n");
+    fprintf(tmp_file, "                \"rank\": %d,\n", rank);
+    fprintf(tmp_file, "                \"dims\": [");
     for (i=0; i<rank-1; i++){
-        fprintf(results_file, " %d,", n[i]);
+        fprintf(tmp_file, " %d,", n[i]);
     }
-    fprintf(results_file, " %d],\n", n[rank-1]);
-    fprintf(results_file, "            \"fs_Hz\": %0.2e,\n", fs);
-    fprintf(results_file, "            \"iterations\": %d,\n", niters);
-    fprintf(results_file, "            \"threads\": %d\n", nthreads);
-    fprintf(results_file, "        },\n");
-    fprintf(results_file, "        \"forward_dft_results\": {\n");
-    fprintf(results_file, "            \"average_execution_time_seconds\": %0.5f,\n", average_forward_dft_exec_time);
-    fprintf(results_file, "            \"average_tflops\": %0.5Lf\n", forward_dft_tflops_approx);
-    fprintf(results_file, "        },\n");
-    fprintf(results_file, "        \"backward_dft_results\": {\n");
-    fprintf(results_file, "            \"average_execution_time_seconds\": %0.5f,\n", average_backward_dft_exec_time);
-    fprintf(results_file, "            \"average_tflops\": %0.5Lf\n", backward_dft_tflops_approx);
-    fprintf(results_file, "        }\n");
-    fprintf(results_file, "    }\n");
-    fprintf(results_file, "}\n");
+    fprintf(tmp_file, " %d],\n", n[rank-1]);
+    fprintf(tmp_file, "                \"fs_Hz\": %0.2e,\n", fs);
+    fprintf(tmp_file, "                \"iterations\": %d,\n", niters);
+    fprintf(tmp_file, "                \"threads\": %d\n", nthreads);
+    fprintf(tmp_file, "            },\n");
+    fprintf(tmp_file, "            \"forward_dft_results\": {\n");
+    fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_forward_dft_exec_time);
+    fprintf(tmp_file, "                \"average_tflops\": %0.5Lf\n", forward_dft_tflops_approx);
+    fprintf(tmp_file, "            },\n");
+    fprintf(tmp_file, "            \"backward_dft_results\": {\n");
+    fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_backward_dft_exec_time);
+    fprintf(tmp_file, "                \"average_tflops\": %0.5Lf\n", backward_dft_tflops_approx);
+    fprintf(tmp_file, "            }\n");
+    fprintf(tmp_file, "        }\n");
+    fprintf(tmp_file, "    }\n");
+    fprintf(tmp_file, "}\n");
 
-    fclose(results_file);
+    // Make sure to close file!
+    fclose(tmp_file);
+
+    // Change filename now
+    rename(tmp_filename, filename);
 
     printf("\nPERFORMANCE RESULTS\n");
     printf("===================\n");

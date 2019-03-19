@@ -5,6 +5,7 @@ usage() {
     echo "  REQUIRED:"
     echo "  -i  Number of iterations. For 2d_fft, use this value to emulate the number of images processed. For nd_cosine_ffts, use this value to emulate the number of cosine matrices to perform fourier transforms on."
     echo "  -e  Path to executable."
+    echo "  -j  JSON document filename. Results of the FFTW benchmarks will be saved to a JSON document with this filename. Note that this file will NOT be overwritten. Instead, data will be appended to it."
     echo ""
     echo "  REQUIRED FOR nd_cosine_ffts"
     echo "  -r  Rank. The number of dimensions of the n-dimensional cosine"
@@ -32,8 +33,9 @@ num_executions=-2222
 rank=-2222
 fs=-2222
 plot=0
+json_doc="NULL"
 
-options=":hpi:f:e:t:d:l:v:r:"
+options=":hpi:f:e:t:d:l:v:r:j:"
 while getopts "$options" x
 do
     case "$x" in
@@ -69,6 +71,9 @@ do
           ;;
       f)
           fs=${OPTARG}
+          ;;
+      j)
+          json_doc=${OPTARG}
           ;;
       *)  
           usage
@@ -161,11 +166,17 @@ elif [ "$executable" == "nd_cosine_ffts" ]; then
 
     # Make sure the user input a sampling frequency (Fs). If not, throw an error
     if (( $(echo "$fs == -2222" | bc -l) )); then
-        echo "Missing argument -f. Please pass in a value for -f."
+        echo "Missing argument -f. Please supply a value for -f."
         usage
     elif (( $(echo "$fs <= 0" | bc -l) )); then
         echo "Sampling frequency must be greater than 0."
         exit
+    fi
+
+    # Check if JSON filename was passed
+    if [[ "$json_doc" == "NULL" ]]; then
+        echo "No JSON document name was passed. Please supply a value for -j"
+        usage
     fi
 
     # Check the rank vs passed in dimensions
@@ -195,30 +206,30 @@ elif [ "$executable" == "nd_cosine_ffts" ]; then
         echo "Using default thread values."
         for (( k=1; k<$max_threads; k*=2 ))
         do
-            echo "Executing ./nd_cosine_ffts $should_plot nthreads=$k num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
+            echo "Executing ./nd_cosine_ffts $should_plot json=$json_doc nthreads=$k num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $k $num_executions $fs $rank $dimensions >> $run_log
+                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             else
-                ./nd_cosine_ffts $should_plot $k $num_executions $fs $rank $dimensions >> $run_log
+                ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             fi
         done
         if [ $max_threads > $k ]; then
-            echo "Executing ./nd_cosine_ffts $should_plot nthreads=$max_threads num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
+            echo "Executing ./nd_cosine_ffts $should_plot json=$json_doc nthreads=$max_threads num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $max_threads $num_executions $fs $rank $dimensions >> $run_log
+                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $max_threads $num_executions $fs $rank $dimensions >> $run_log
             else
-                ./nd_cosine_ffts $should_plot $max_threads $num_executions $fs $rank $dimensions >> $run_log
+                ./nd_cosine_ffts $should_plot $json_doc $max_threads $num_executions $fs $rank $dimensions >> $run_log
             fi
         fi
     # Else, use the thread values the user specified
     else
         echo "Using custom thread values."
         for k in $thread_values; do
-            echo "Executing ./nd_cosine_ffts $should_plot nthreads=$k num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
+            echo "Executing ./nd_cosine_ffts $should_plot json=$json_doc nthreads=$k num_executions=$num_executions fs=$fs rank=$rank dims=\"$dimensions\""
             if [ $use_numactl == 1 ]; then
-                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $k $num_executions $fs $rank $dimensions >> $run_log
+                numactl -C 0-$num_threads -i 0,1 ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             else
-                ./nd_cosine_ffts $should_plot $k $num_executions $fs $rank $dimensions >> $run_log
+                ./nd_cosine_ffts $should_plot $json_doc $k $num_executions $fs $rank $dimensions >> $run_log
             fi
         done
     fi
