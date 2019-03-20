@@ -6,6 +6,14 @@ ENV LANG=en_US.utf8
 ENV FFTW_CFLAGS="-O2 -ftree-vectorize -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -Wp,-D_GLIBCXX_ASSERTIONS -fexceptions -fstack-protector-strong -grecord-gcc-switches %{_hardened_cflags} %{_annotated_cflags}"
 ENV FFTW_BUILD_FLAGS="--enable-sse2 --enable-avx --enable-avx2 --enable-fma"
 
+# Flag for running the benchmarks
+ARG run_benchmarks="false"
+ENV RUN_BENCHMARKS=${run_benchmarks}
+
+# Flag for using numactl
+ARG use_numactl="false"
+ENV USE_NUMACTL=${use_numactl}
+
 # Create RHEL 8 repos
 ENV RHEL8_LATEST /etc/yum.repos.d/rhel80.repo
 ENV RHEL8_ADDITIONAL /etc/yum.repos.d/rhel8-additional-nightly.repo
@@ -40,6 +48,7 @@ RUN dnf -y install automake \
                    http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgfortran-8.2.1-3.5.el8.x86_64.rpm \
                    http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libgomp-8.2.1-3.5.el8.x86_64.rpm \
                    http://download.eng.bos.redhat.com/brewroot/vol/rhel-8/packages/gcc/8.2.1/3.5.el8/x86_64/libquadmath-8.2.1-3.5.el8.x86_64.rpm \
+                   bc \
                    diffutils \
                    environment-modules \
                    libtool \
@@ -61,6 +70,7 @@ RUN dnf -y install automake \
                    rpmlint \ 
                    time \
                    wget --allowerasing --best && \
+    if [ ${USE_NUMACTL} == "true" ]; then dnf -y install numactl && rm -rf /var/cache/dnf*; fi && \
     /bin/rm -rf /var/cache/dnf*
 
 # Setup rpmbuild tree
@@ -129,15 +139,9 @@ ADD ../compile_benchmark_code.sh ${FFTW_BENCHMARKS}
 ADD ../run_benchmarks.sh ${FFTW_BENCHMARKS}
 ADD ../test_images/cat.jpeg ${FFTW_BENCHMARKS}/test_images
 
-# Flag for using numactl
-ARG use_numactl="false"
-ENV USE_NUMACTL=${use_numactl}
-
 # Compile and run the benchmarks
-RUN dnf -y install bc && \
-    if [ ${USE_NUMACTL} == "true" ]; then dnf -y install numactl; fi && \
-    rm -rf /var/cache/dnf* && \
-    cd ${FFTW_BENCHMARKS} && \
-    . ./compile_benchmark_code.sh /root/rpmbuild/BUILD/fftw-3.3.5 && \
-    if [ ${USE_NUMACTL} == "true" ]; then sh run_benchmarks.sh -n -e "nd_cosine_ffts" -i 3 -r 2 -d "30000 30000" -f 0.00001 -j "fftw_cosine_performance_results.json"; else  sh run_benchmarks.sh -e "nd_cosine_ffts" -i 3 -r 2 -d "30000 30000" -f 0.00001 -j "fftw_cosine_performance_results.json"; fi && \
-    cat fftw_cosine_performance_results.json
+RUN if [ ${RUN_BENCHMARKS} == "true" ]; then \
+        cd ${FFTW_BENCHMARKS} && \
+        . ./compile_benchmark_code.sh /root/rpmbuild/BUILD/fftw-3.3.5 && \
+        if [ ${USE_NUMACTL} == "true" ]; then sh run_benchmarks.sh -n -e "nd_cosine_ffts" -i 3 -r 2 -d "30000 30000" -f 0.00001 -j "fftw_cosine_performance_results.json"; else  sh run_benchmarks.sh -e "nd_cosine_ffts" -i 3 -r 2 -d "30000 30000" -f 0.00001 -j "fftw_cosine_performance_results.json"; fi && \
+        cat fftw_cosine_performance_results.json; fi
