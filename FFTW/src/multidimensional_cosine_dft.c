@@ -125,6 +125,12 @@ int main(int argc, char* argv[]){
     // Initialize the cosine that will be returned from the complex DFT
     double *cosine_back = (double*)fftw_malloc(n_total * sizeof(fftw_complex));
 
+    // We'll need to do work on a dummy array to prevent the compiler from optimizing the loop
+    int dummy[niters];
+    srand(time(0));
+    int rand_idx; //random index
+    int max_idx = n_total - 1; //max index of the cosine array (matrix)
+
     // Iterate
     for (j=0; j<niters; j++){
         // Create FFTW plans
@@ -153,6 +159,10 @@ int main(int argc, char* argv[]){
         backward_dft_execution_time *= (1.0e-3); 
         total_b_dft_exec_time += backward_dft_execution_time;
 
+        // Do work on dummy array to prevent the compiler from optimizing on its own
+        rand_idx = rand() % (max_idx + 1);
+        dummy[j] = j + cosine_back[rand_idx];
+
         // Destroy FFTW plans
         fftw_destroy_plan(forward_cos_dft_plan);
         fftw_destroy_plan(backward_cos_dft_plan);
@@ -169,12 +179,15 @@ int main(int argc, char* argv[]){
     long double forward_dft_mflops_approx = 5 * n_total * log2l(n_total) / average_forward_dft_exec_time;
     long double backward_dft_mflops_approx = 5 * n_total * log2l(n_total) / average_backward_dft_exec_time;
 
-    long double forward_dft_tflops_approx = forward_dft_mflops_approx * (1e-6);
-    long double backward_dft_tflops_approx = backward_dft_mflops_approx * (1e-6);
+    long double forward_dft_gflops_approx = forward_dft_mflops_approx * (1e-6);
+    long double backward_dft_gflops_approx = backward_dft_mflops_approx * (1e-6);
 
     // Plot result to ensure we get back what we put in!
     if (plot == true)
         plot1D(cosine_back, 1, rank, n, title);
+
+    //Now put 'dummy' to use so that the compiler doesn't get rid of it
+    cosine_back[0] = dummy[0];
 
     // Prepare file to save results to
     //char *filename = "fftw_cosine_performance_results.json";
@@ -259,11 +272,11 @@ int main(int argc, char* argv[]){
     fprintf(tmp_file, "            },\n");
     fprintf(tmp_file, "            \"forward_dft_results\": {\n");
     fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_forward_dft_exec_time);
-    fprintf(tmp_file, "                \"average_tflops\": %0.5Lf\n", forward_dft_tflops_approx);
+    fprintf(tmp_file, "                \"average_gflops\": %0.5Lf\n", forward_dft_gflops_approx);
     fprintf(tmp_file, "            },\n");
     fprintf(tmp_file, "            \"backward_dft_results\": {\n");
     fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_backward_dft_exec_time);
-    fprintf(tmp_file, "                \"average_tflops\": %0.5Lf\n", backward_dft_tflops_approx);
+    fprintf(tmp_file, "                \"average_gflops\": %0.5Lf\n", backward_dft_gflops_approx);
     fprintf(tmp_file, "            }\n");
     fprintf(tmp_file, "        }\n");
     fprintf(tmp_file, "    }\n");
@@ -287,9 +300,9 @@ int main(int argc, char* argv[]){
     printf("    %d threads used\n", nthreads);
     printf("DFT Results\n");
     printf("    Forward DFT execution time: %0.3f sec\n", average_forward_dft_exec_time);
-    printf("    Forward DFT TFlops: %0.3Lf\n", forward_dft_tflops_approx);
+    printf("    Forward DFT GFlops: %0.3Lf\n", forward_dft_gflops_approx);
     printf("    Backward DFT execution time: %0.3f sec\n", average_backward_dft_exec_time);
-    printf("    Backward DFT TFlops: %0.3Lf\n", backward_dft_tflops_approx);
+    printf("    Backward DFT GFlops: %0.3Lf\n", backward_dft_gflops_approx);
 
     return 0;
 }
