@@ -95,15 +95,21 @@ int main(int argc, char* argv[]){
     // Performance variables
     struct timeval forward_dft_start, forward_dft_stop;
     struct timeval backward_dft_start, backward_dft_stop;
-    double forward_dft_execution_time = 0.0;
-    double backward_dft_execution_time = 0.0;
-    double total_f_dft_exec_time = 0.0;
-    double total_b_dft_exec_time = 0.0;
+    double forward_dft_execution_time_us = 0.0; //Forward DFT execution time in microseconds (us)
+    double backward_dft_execution_time_us = 0.0; //Backward DFT in us
+    double total_f_dft_exec_time_us = 0.0; //total forward DFT in us
+    double total_b_dft_exec_time_us = 0.0; //total backward DFT in us
 
     // Get the total number of indices
     for (i=0; i<rank; i++){
         n_total *= n[i];
     }
+
+    // For a complex transform, we have n[0] x n[1] x n[2] x ... x (n[rank-1]/2 + 1). So, our math is
+    // as follows: n_total = n[0] x n[1] x n[2] x ... x n[rank-1]. Since n_total includes n[d-1], we have
+    // to divide n_total by n[rank-1] to get n_toral = n[0] x n[1] x n[2] x ... x n[rank-2]. Then we 
+    // multiply by n[rank-1] / 2 + 1
+    int n_complex_total = (n_total / n[rank-1]) * (n[rank-1] / 2 + 1);
 
     // Set threading
     fftw_init_threads();
@@ -120,10 +126,10 @@ int main(int argc, char* argv[]){
 
     // Initialize real-to-complex cosine input and output
     double *cosine_original = (double*)fftw_malloc(n_total * sizeof(double));
-    fftw_complex *cosine_complex = (fftw_complex*)fftw_malloc(n_total * sizeof(fftw_complex));
+    fftw_complex *cosine_complex = (fftw_complex*)fftw_malloc(n_complex_total * sizeof(fftw_complex));
 
     // Initialize the cosine that will be returned from the complex DFT
-    double *cosine_back = (double*)fftw_malloc(n_total * sizeof(fftw_complex));
+    double *cosine_back = (double*)fftw_malloc(n_total * sizeof(double));
 
     // We'll need to do work on a dummy array to prevent the compiler from optimizing the loop
     int dummy[niters];
@@ -145,19 +151,17 @@ int main(int argc, char* argv[]){
         gettimeofday(&forward_dft_start, NULL); //start clock
         fftw_execute(forward_cos_dft_plan);
         gettimeofday(&forward_dft_stop, NULL); //stop clock
-        forward_dft_execution_time = (forward_dft_stop.tv_sec - forward_dft_start.tv_sec) * 1000.0;// sec to ms
-        forward_dft_execution_time += (forward_dft_stop.tv_usec - forward_dft_start.tv_usec)/ 1000.0;// us to ms
-        forward_dft_execution_time *= (1.0e-3); 
-        total_f_dft_exec_time += forward_dft_execution_time;
+        forward_dft_execution_time_us = (forward_dft_stop.tv_sec - forward_dft_start.tv_sec) * (1e6); //sec to us
+        forward_dft_execution_time_us += (forward_dft_stop.tv_usec - forward_dft_start.tv_usec);
+        total_f_dft_exec_time_us += forward_dft_execution_time_us;
 
         // Execute Backward DFT and capture performance time
         gettimeofday(&backward_dft_start, NULL); //start clock
         fftw_execute(backward_cos_dft_plan);
         gettimeofday(&backward_dft_stop, NULL); //stop clock
-        backward_dft_execution_time = (backward_dft_stop.tv_sec - backward_dft_start.tv_sec) * 1000.0;// sec to ms
-        backward_dft_execution_time += (backward_dft_stop.tv_usec - backward_dft_start.tv_usec)/ 1000.0;// us to ms
-        backward_dft_execution_time *= (1.0e-3); 
-        total_b_dft_exec_time += backward_dft_execution_time;
+        backward_dft_execution_time_us = (backward_dft_stop.tv_sec - backward_dft_start.tv_sec) * (1e6);// sec to us
+        backward_dft_execution_time_us += (backward_dft_stop.tv_usec - backward_dft_start.tv_usec);
+        total_b_dft_exec_time_us += backward_dft_execution_time_us;
 
         // Do work on dummy array to prevent the compiler from optimizing on its own
         rand_idx = rand() % (max_idx + 1);
@@ -172,15 +176,15 @@ int main(int argc, char* argv[]){
     fftw_cleanup_threads();
 
     // Get average times
-    double average_forward_dft_exec_time = total_f_dft_exec_time / niters;
-    double average_backward_dft_exec_time = total_b_dft_exec_time / niters;
+    double average_forward_dft_exec_time_us = total_f_dft_exec_time_us / niters;
+    double average_backward_dft_exec_time_us = total_b_dft_exec_time_us / niters;
 
     // Compute teraflops (see here for info on how to calculate mflops: http://www.fftw.org/speed/)
-    long double forward_dft_mflops_approx = 5 * n_total * log2l(n_total) / average_forward_dft_exec_time;
-    long double backward_dft_mflops_approx = 5 * n_total * log2l(n_total) / average_backward_dft_exec_time;
+    long double forward_dft_mflops_approx = 5 * n_total * log2l(n_total) / (average_forward_dft_exec_time_us * 2);
+    long double backward_dft_mflops_approx = 5 * n_total * log2l(n_total) / (average_backward_dft_exec_time_us * 2);
 
-    long double forward_dft_gflops_approx = forward_dft_mflops_approx * (1e-6);
-    long double backward_dft_gflops_approx = backward_dft_mflops_approx * (1e-6);
+    long double forward_dft_gflops_approx = forward_dft_mflops_approx * (1e-3);
+    long double backward_dft_gflops_approx = backward_dft_mflops_approx * (1e-3);
 
     // Plot result to ensure we get back what we put in!
     if (plot == true)
@@ -271,11 +275,11 @@ int main(int argc, char* argv[]){
     fprintf(tmp_file, "                \"threads\": %d\n", nthreads);
     fprintf(tmp_file, "            },\n");
     fprintf(tmp_file, "            \"forward_dft_results\": {\n");
-    fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_forward_dft_exec_time);
+    fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_forward_dft_exec_time_us * (1e-6));
     fprintf(tmp_file, "                \"average_gflops\": %0.5Lf\n", forward_dft_gflops_approx);
     fprintf(tmp_file, "            },\n");
     fprintf(tmp_file, "            \"backward_dft_results\": {\n");
-    fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_backward_dft_exec_time);
+    fprintf(tmp_file, "                \"average_execution_time_seconds\": %0.5f,\n", average_backward_dft_exec_time_us * (1e-6));
     fprintf(tmp_file, "                \"average_gflops\": %0.5Lf\n", backward_dft_gflops_approx);
     fprintf(tmp_file, "            }\n");
     fprintf(tmp_file, "        }\n");
@@ -299,9 +303,9 @@ int main(int argc, char* argv[]){
     printf("    %d iterations\n", niters);
     printf("    %d threads used\n", nthreads);
     printf("DFT Results\n");
-    printf("    Forward DFT execution time: %0.3f sec\n", average_forward_dft_exec_time);
+    printf("    Forward DFT execution time: %0.3f sec\n", average_forward_dft_exec_time_us * (1e-6));
     printf("    Forward DFT GFlops: %0.3Lf\n", forward_dft_gflops_approx);
-    printf("    Backward DFT execution time: %0.3f sec\n", average_backward_dft_exec_time);
+    printf("    Backward DFT execution time: %0.3f sec\n", average_backward_dft_exec_time_us * (1e-6));
     printf("    Backward DFT GFlops: %0.3Lf\n", backward_dft_gflops_approx);
 
     return 0;
