@@ -118,7 +118,7 @@ RUN dnf -y install unzip dos2unix && \
     rm jpegsr6.zip && \
     wget https://imagemagick.org/download/ImageMagick.tar.gz && \
     tar xvf ImageMagick.tar.gz && \
-    cd ImageMagick-7.0.8-34 && \
+    cd ImageMagick-7* && \
     ./configure && \
     make && \
     make install && \
