@@ -186,6 +186,10 @@ int main(int argc, char* argv[]){
     long double forward_dft_gflops_approx = forward_dft_mflops_approx * (1e-3);
     long double backward_dft_gflops_approx = backward_dft_mflops_approx * (1e-3);
 
+    // Fix cosine_back because its height has been adjusted by the FFT
+    for (i=0; i<n_total; i++)
+        cosine_back[i] /= n_total;
+
     // Plot result to ensure we get back what we put in!
     if (plot == true)
         plot1D(cosine_back, 1, rank, n, title);
