@@ -15,7 +15,7 @@
 
 void generate_cosine_data(double *cosine, double fs, int rank, int *n, int matrix_size);
 void fill_row(double *cosine, double fs, int row_length, int start_idx, int n_sum, int matrix_size);
-void plot1D(double *cosine, int dim, int rank, int *n, char *title);
+void plot1D(double *cosine, int dim, int rank, int *n, double fs, char *title);
 
 int main(int argc, char* argv[]){
 
@@ -192,7 +192,7 @@ int main(int argc, char* argv[]){
 
     // Plot result to ensure we get back what we put in!
     if (plot == true)
-        plot1D(cosine_back, 1, rank, n, title);
+        plot1D(cosine_back, 1, rank, n, fs, title);
 
     //Now put 'dummy' to use so that the compiler doesn't get rid of it
     cosine_back[0] = dummy[0];
@@ -341,7 +341,7 @@ void fill_row(double *cosine, double fs, int row_length, int start_idx, int n_su
     if (start_idx < matrix_size){
         int i; //iterative var
         for (i=0; i<row_length; i++){
-            cosine[i+start_idx] = cos(i*fs*180/PI);
+            cosine[i+start_idx] = cos((i+start_idx)*fs*PI);
         }
 
         fill_row(cosine, fs, row_length, start_idx+n_sum, n_sum, matrix_size);
@@ -399,7 +399,7 @@ void generate_cosine_data(double *cosine, double fs, int rank, int *n, int matri
     }
 }
 
-void plot1D(double *cosine, int dim_to_plot, int rank, int *n, char *title){
+void plot1D(double *cosine, int dim_to_plot, int rank, int *n, double fs, char *title){
 /* Plot cosine data for a specific dimension
  *
  * Inputs
@@ -415,6 +415,9 @@ void plot1D(double *cosine, int dim_to_plot, int rank, int *n, char *title){
  *
  *   int *n
  *       An array which contains the dimensions of the data array
+ *
+ *   double fs
+ *       Sampling frequency
  *
  *   char *title
  *       Title of the plot
@@ -441,7 +444,7 @@ void plot1D(double *cosine, int dim_to_plot, int rank, int *n, char *title){
     for (i=0; i<N; i++){
 
         // Get x-values (simply just store index i)
-        xvals[i] = i;
+        xvals[i] = i * fs * PI;
 
         // Get y-values
         yvals[i] = cosine[i+row_start_idx];
@@ -459,13 +462,14 @@ void plot1D(double *cosine, int dim_to_plot, int rank, int *n, char *title){
 
     // Prepare title (no more than 100 chars)
     char plot_title[100];
-    sprintf(plot_title, "set title \"%s\"", title);
+    sprintf(plot_title, "set title \"%s\" offset 0,200", title);
 
     // Prepare gnuplot commands
-    char *gnuplot_cmds[] = {plot_title, "plot 'cosine_data.txt' with line"};
+    char *gnuplot_cmds[] = {plot_title, "set lmargin screen 0.10", "set bmargin screen 0.05", "set rmargin screen 0.95", "set tmargin screen 0.95", "set grid ytics lc rgb \"#bbbbbb\" lw 1 lt 0", "set grid xtics lc rgb \"#bbbbbb\" lw 1 lt 0", "set ylabel \"IFFT ( DFT ( cos(x) ) )\" offset -200", "set xtics pi offset 0,-200", "set format x '%.0Pπ'", "plot 'cosine_data.txt' with line notitle"};
+    //char *gnuplot_cmds[] = {plot_title, "plot 'cosine_data.txt' with line"};
 
     // Now plot
-    for (i=0; i<2; i++){
+    for (i=0; i<11; i++){
         fprintf(gnuplot_pipe, "%s \n", gnuplot_cmds[i]);
     }
 }
